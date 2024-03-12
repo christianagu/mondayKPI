@@ -12,7 +12,7 @@ Read the README!
 
 # Monday
 # Gather our project data and format KPI data
-async def gather_and_map_data(monday_projects):
+async def process_monday_data(monday_projects):
         try:
             os.system('cls')
         except Exception as e:
@@ -32,7 +32,7 @@ async def gather_and_map_data(monday_projects):
 
         print("\nGrouping our projects by Frequency...\n")
         # Using our grouped region data to then group by frequency (Monthly/Quarterly)
-        projects_by_frequency = await monday_projects.group_projects_by_frequency(projects_by_region)
+        projects_by_frequency = await monday_projects.group_projects_by_month(projects_by_region)
         print("Complete...\n")
 
         print("\nGathering KPI Stats for Slides Presentation...\n")
@@ -41,26 +41,13 @@ async def gather_and_map_data(monday_projects):
 
         return kpi_by_month, kpi_by_quarter
 
-
-async def create_update_slides(google_slides):
-    slide_request = [
-            {
-                'createSlide': {
-                    'objectId': 'Q1_BY_REGION',  # Google Slides will generate an ID if not specified
-                    'insertionIndex': '1',
-                    'slideLayoutReference': {
-                        'predefinedLayout': 'TITLE_ONLY'
-                    }
-                }
-            }
-        ]
-
-    create_slide_response = await google_slides.create_request(slide_request)        
+# Util to help with finding the title_place_holder. Should maybe be in gsuites.py
+def find_title_placeholder(google_slides, create_slide_response, slide_index):
     # Get the ID of the newly created slide
     slide_object_id = create_slide_response.get('replies')[0].get('createSlide').get('objectId')
     print(f"Created slide ID: {slide_object_id}")
     # Assuming 'service' and 'presentation_id' are already defined
-    slide = google_slides.get_slide().get('slides')[1]
+    slide = google_slides.get_slide().get('slides')[int(slide_index)]
     
     # Find the title placeholder
     for obj in slide['pageElements']:
@@ -68,48 +55,76 @@ async def create_update_slides(google_slides):
             if obj['shape']['placeholder']['type'] == 'TITLE':
                 title_placeholder_object_id = obj['objectId']
                 break
+
+    return title_placeholder_object_id
+
+
+# Set up our slides by using gsuite.py functions:
+# - create slides for each data set from monday
+# - Create titles for each slide
+# - Create tables for each slide
+async def setup_slides(google_slides):
+    ###
+    """Create Quarterly Slides"""
+    ###
+    # Slide Parameters
+    slide_object_id = 'Q1_BY_REGION'
+    insertion_index = '1'
+    predefined_layout = 'TITLE_ONLY'
+
+    ## Create slide function called using parameters above
+    create_slide_response = await google_slides.create_slide_request(slide_object_id, insertion_index, predefined_layout)
+    
+    # Title parameters
+    slide_index = '1'
+    title_placeholder_object_id = find_title_placeholder(google_slides, create_slide_response, slide_index)
+    title_text = 'Quarter by Region'
+    title_insertion_index = 0
+    
+
     # Insert the title into the newly created slide
-    insert_title_requests = [
-        {
-            'insertText': {
-                'objectId': title_placeholder_object_id,
-                'text': 'Quarter 1 by Region',
-                'insertionIndex': 0
-            }
-        }
-    ]
-    create_title = await google_slides.create_request(insert_title_requests)
+    create_title = await google_slides.insert_title_request(title_placeholder_object_id, title_text, title_insertion_index)
     print("Title inserted.")
     
-    # Create  table requests
-    create_table_requests = [
-        {
-            'createTable': {
-                'objectId': 'q1RegionTable',
-                'elementProperties': {
-                    'pageObjectId': slide_object_id,
-                    'size': {
-                        'height': {'magnitude': 2500000, 'unit': 'EMU'},
-                        'width': {'magnitude': 8000000, 'unit': 'EMU'}
-                    },
-                    'transform': {
-                        'scaleX': 1,
-                        'scaleY': 1,
-                        'translateX': 311700,
-                        'translateY': 1100000,
-                        #'translateY': 1157225,
-                        'unit': 'EMU'
-                    }
-                },
-                'rows': 6,
-                'columns': 5
-            }
-        }
-    ]
-    create_table_response = await google_slides.create_request(create_table_requests)
+    # Table parameters
+    monthly_table_by_region = 'q1RegionTable'
+
+    # Create table with passed parameters
+    create_table_response = await google_slides.create_table_request(monthly_table_by_region, slide_object_id)
+
+
+
+    ###
+    """Create Monthly Slides"""
+    ###
+    # Slide Parameters
+    slide_object_id = 'MONTH_BY_REGION'
+    insertion_index = '2'
+    predefined_layout = 'TITLE_ONLY'
+
+    ## Create slide function called using parameters above
+    create_slide_response = await google_slides.create_slide_request(slide_object_id, insertion_index, predefined_layout)
+    
+    # Title parameters
+    slide_index = '2'
+    title_placeholder_object_id = find_title_placeholder(google_slides, create_slide_response, slide_index)
+    title_text = 'Quarter 1 Breakdown'
+    title_insertion_index = 0
+    
+    # Insert the title into the newly created slide
+    create_title = await google_slides.insert_title_request(title_placeholder_object_id, title_text, title_insertion_index)
+    print("Title inserted.")
+    
+    # Table Parameters
+    monthly_table_by_region = 'q1MonthlyRegionTable'
+
+    # Create table with passed parameters
+    create_table_response = await google_slides.create_table_request(monthly_table_by_region, slide_object_id)
     print("Table Created.")
 
-async def kpi_to_matrix(google_slides, kpi_by_month, kpi_by_quarter):
+
+# Insert data into our google slides tables that were created
+async def kpi_to_slides(google_slides, kpi_by_month, kpi_by_quarter):
     slideByRegionHeaders = [
             [None,"EMEA", "APAC", "NA", "Overall"],
             ["Signed"],
@@ -127,48 +142,64 @@ async def kpi_to_matrix(google_slides, kpi_by_month, kpi_by_quarter):
             4: 'paused_projects',
             5: 'projects_completed',
         }
-
-    for quarter, regions_data in kpi_by_quarter.items():
-        print(f"Quarter: {quarter}\n")
-        # Initialize storage for overall counts in the quarter
-        overall_counts = {key: 0 for key in title_to_key_map.values()}
+    
+    data_sets = [kpi_by_month, kpi_by_quarter]
+    
+    for data in data_sets:
+        for data_time_cadence, regions_data in data.items():
+            # Initialize storage for overall counts in the quarter
+            overall_counts = {key: 0 for key in title_to_key_map.values()}
+            
+            for title_index, data_key in title_to_key_map.items():
+                # Initialize the list for this row with the title included
+                row_data = [slideByRegionHeaders[title_index][0]]
+                
+                for region in slideByRegionHeaders[0][1:]:  # Skip the first None value
+                    if region == "Overall":
+                        # Append the overall counts instead of getting them from the data
+                        row_data.append(str(overall_counts[data_key]))
+                    else:
+                        # Fetch and append the data for each region
+                        region_data = regions_data.get(region, {})
+                        count = region_data.get(data_key, 0)
+                        row_data.append(str(count))
+                        # Update the overall counts
+                        overall_counts[data_key] += count
+                
+                # Replace the old row data in slideByRegionHeaders with the new row_data
+                slideByRegionHeaders[title_index] = row_data
         
-        for title_index, data_key in title_to_key_map.items():
-            # Initialize the list for this row with the title included
-            row_data = [slideByRegionHeaders[title_index][0]]
-            
-            for region in slideByRegionHeaders[0][1:]:  # Skip the first None value
-                if region == "Overall":
-                    # Append the overall counts instead of getting them from the data
-                    row_data.append(str(overall_counts[data_key]))
+            requests = []
+        # Generating requests to populate the table
+        for row_index, row in enumerate(slideByRegionHeaders):
+            for col_index, text in enumerate(row):
+                if 'Q1' in data_time_cadence:
+                    # Each cell is targeted by row and column for text insertion
+                    requests.append({
+                        'insertText': {
+                            'objectId': 'q1RegionTable',
+                            'cellLocation': {
+                                'rowIndex': row_index,
+                                'columnIndex': col_index,
+                            },
+                            'text': text,
+                            'insertionIndex':0, # Insert at the beginning of the cell
+                        }
+                    })
                 else:
-                    # Fetch and append the data for each region
-                    region_data = regions_data.get(region, {})
-                    count = region_data.get(data_key, 0)
-                    row_data.append(str(count))
-                    # Update the overall counts
-                    overall_counts[data_key] += count
-            
-            # Replace the old row data in slideByRegionHeaders with the new row_data
-            slideByRegionHeaders[title_index] = row_data
-    requests = []
-    # Generating requests to populate the table
-    for row_index, row in enumerate(slideByRegionHeaders):
-        for col_index, text in enumerate(row):
-            # Each cell is targeted by row and column for text insertion
-            requests.append({
-                'insertText': {
-                    'objectId': 'q1RegionTable',
-                    'cellLocation': {
-                        'rowIndex': row_index,
-                        'columnIndex': col_index,
-                    },
-                    'text': text,
-                    'insertionIndex': 0, # Insert at the beginning of the cell
-                }
-            })
-    response = await google_slides.create_request(requests)
-    print("Table populated.")
+                    requests.append({
+                        'insertText': {
+                            'objectId': 'q1MonthlyRegionTable',
+                            'cellLocation': {
+                                'rowIndex': row_index,
+                                'columnIndex': col_index,
+                            },
+                            'text': text,
+                            'insertionIndex':0, # Insert at the beginning of the cell
+                        }
+                    })
+        response = await google_slides.create_request(requests)
+        print("Table populated.")
 
 async def main():
 
@@ -177,11 +208,10 @@ async def main():
         #presentation_id = '1UNK_F66Uc6WMB4EBQ9FYdao_GXU4E6pKTL5jkGQ1tQ4'
         presentation_id = input("Insert presentation ID...\n")
         google_slides = GoogleSlides(presentation_id)
-        kpi_by_month, kpi_by_quarter = await gather_and_map_data(monday_projects)
         
-        await create_update_slides(google_slides)
-        await kpi_to_matrix(google_slides, kpi_by_month, kpi_by_quarter)
-        
+        kpi_by_month, kpi_by_quarter = await process_monday_data(monday_projects)
+        await setup_slides(google_slides)
+        await kpi_to_slides(google_slides, kpi_by_month, kpi_by_quarter)    
 
     except Exception as e:
         print(f'An error occurred: {e}')

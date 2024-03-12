@@ -229,7 +229,7 @@ class MondayBoards(MondayBase):
 
 
     # Group projects by frequency (Monthly / Quarterly)
-    async def group_projects_by_frequency(self, grouped_project_boards):
+    async def group_projects_by_month(self, grouped_project_boards):
         projects_by_monthly_freq = {}
         projects_by_quarter_freq = {}
 
