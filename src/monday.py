@@ -5,8 +5,6 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from dotenv import load_dotenv
 from datetime import datetime
 import json
-import sys
-import time
 
 load_dotenv()  # Load environment variables
 
@@ -146,7 +144,7 @@ class MondayBoards(MondayBase):
                         # Example of adjusting the region based on the 'country' field
                         if key == 'country':
                             country = column_value['text'].lower()
-                            if country in ['united states', 'canada', 'mexico', 'brazil']:
+                            if country in ['united states', 'canada', 'mexico', 'brazil', 'colombia']:
                                 item['region'] = 'NA'
                             elif country in ['australia', 'china', 'india', 'indonesia', 'mongolia', 'hong kong']:
                                 item['region'] = 'APAC'
