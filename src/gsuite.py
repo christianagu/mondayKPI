@@ -13,7 +13,6 @@ class GoogleBase:
         self.creds = service_account.Credentials.from_service_account_file(
             SERVICE_ACCOUNT_FILE, scopes=google_scopes)
         self.service = build(google_app, google_app_version, credentials=self.creds)
-        self.presentation_id = presentation_id
     
 
 class GoogleDrive(GoogleBase):
@@ -129,6 +128,9 @@ class GoogleDrive(GoogleBase):
             print(f"An error occurred: {error}")
 
 class GoogleSlides(GoogleBase):
+        def __init__(self, google_scopes, google_app, google_app_version, presentation_id):
+            super().__init__(google_scopes, google_app, google_app_version)
+            self.presentation_id = presentation_id
 
     # Get slide data
     def get_slide(self):
