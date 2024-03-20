@@ -6,8 +6,8 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 import time
 import os
-import datetime
-
+from datetime import datetime
+import time
 
 """
 Read the README!
@@ -194,14 +194,18 @@ async def main():
             'google_app': 'slides',
             'google_app_version': 'v1'
         }
-        google_drive = GoogleDrive(drive_scopes['api_drive_scope'], drive_scopes['google_app'], drive_scopes['google_app_version'], None)
+        google_drive = GoogleDrive(drive_scopes['api_drive_scope'], drive_scopes['google_app'], drive_scopes['google_app_version'])
         monday_projects = MondayBoards()
 
         folder_id = os.getenv('GOOGLE_SLIDES_FOLDER_ID')
         folder_name = os.getenv('GOOGLE_SLIDES_FOLDER_NAME')
         user_email = os.getenv('GOOGLE_EMAIL')
 
+        print('before presentation name initialized')
+
         presentation_name = str(datetime.now().year) + ' Data'
+
+        print(presentation_name)
         
         existing_folder = {'name': folder_name, 'id': '' }
         existing_file = {'name': presentation_name, 'id': '' }
@@ -217,7 +221,7 @@ async def main():
             print("Folder exists....\nGathering file data")
             #folders = await google_drive.list_folders()
 
-            file_id = '1_ERXogtNIjuAJ9Mhn7MqGThjftC_eVz_TmSCzJSWZfA'
+            file_id = '1lkYiUhhod1z5GL_504FvPoJ0B8gcwOpJIgylYkEKV00'
             await google_drive.delete_file(file_id)
 
 
@@ -232,6 +236,7 @@ async def main():
                 await google_drive.add_permissions(created_file_obj.get('id'), user_email, False, role='writer', type='user')
                 
                 print("setting up slides")
+                print(created_file_obj)
                 google_slides = GoogleSlides(presentation_scopes['api_drive_scope'], presentation_scopes['google_app'], presentation_scopes['google_app_version'], created_file_obj.get('id') )
                 
                 

@@ -224,12 +224,36 @@ class MondayBoards(MondayBase):
                                         for month in month_order if month in projects_by_monthly_freq}
         return sorted_projects_by_frequency
 
+    def data_by_int_manager(self, sorted_projects_by_frequency):
+        int_manager_by_month = {}
+        int_manager_by_month_count = {}
+
+        try: 
+            for month, project_frequency in sorted_projects_by_frequency.items():
+                            if month not in int_manager_by_month:
+                                int_manager_by_month[month] = {}
+                                int_manager_by_month_count[month] = {}
+                            for region, group_title in project_frequency.items():
+                                if region not in sorted_projects_by_frequency[month][region]:
+                                    for project_type, projects in group_title.items():
+                                            count = 1
+                                            for project in projects:
+                                                if project['int_manager'] not in int_manager_by_month[month] and project['int_manager'] is not None:
+                                                    int_manager_by_month[month][project['int_manager']] = {}
+                                                    int_manager_by_month_count[month][project['int_manager']] = {}
+                                                if project_type not in int_manager_by_month[month][project['int_manager']]:
+                                                    int_manager_by_month[month][project['int_manager']][project_type] = []
+                                                    int_manager_by_month_count[month][project['int_manager']][project_type] = count
+                                                int_manager_by_month[month][project['int_manager']][project_type].append(project)
+                                                int_manager_by_month_count[month][project['int_manager']][project_type] += count
+            return int_manager_by_month, int_manager_by_month_count
+        except Exception as e:
+            print(e)
 
 
     # Group projects by frequency (Monthly / Quarterly)
     async def group_projects_by_month(self, grouped_project_boards):
         projects_by_monthly_freq = {}
-        projects_by_quarter_freq = {}
 
         try:
             # NA
@@ -308,9 +332,16 @@ class MondayBoards(MondayBase):
     async def gather_kpi_stats(self, sorted_projects_by_frequency):
         kpi_by_month = {}
         kpi_by_quarter = {}
+        int_manager_by_month = {}
+        int_manager_by_quarter_count = {}
+        int_manager_by_month_count = {}
         month_count = 0
 
         try:
+            int_manager_by_month, int_manager_by_month_count = self.data_by_int_manager(sorted_projects_by_frequency)
+            
+
+            print('int_manager_by_month\n',int_manager_by_month)
             for month, project_frequency in sorted_projects_by_frequency.items():
                         if month not in kpi_by_month:
                             kpi_by_month[month] = {}
@@ -341,16 +372,41 @@ class MondayBoards(MondayBase):
                     kpi_by_quarter[quarter][region]['projects_signed'] += len(project_frequency[region]['projects_signed'])
                     kpi_by_quarter[quarter][region]['paused_projects'] += len(project_frequency[region]['paused_projects'])
                     kpi_by_quarter[quarter][region]['projects_completed'] += len(project_frequency[region]['projects_completed'])
-
+                
                 # Reset the month count after each quarter
                 if month_count % 3 == 0:
                     month_count = 0
 
+            month_count = 0
+            for month, project_frequency in int_manager_by_month.items():
+                month_count += 1
+                # Determine the current quarter based on the month count
+                quarter = f"Q{str((month_count - 1) // 3 + 1)}"
+                
+                if quarter not in int_manager_by_quarter_count:
+                    int_manager_by_quarter_count[quarter] = {}
+                
+                for int_manager, group_title in project_frequency.items():
+                    if int_manager not in int_manager_by_quarter_count[quarter]:
+                        int_manager_by_quarter_count[quarter][int_manager] = {'projects_started': 0, 'canceled_projects': 0, 'projects_signed': 0, 'paused_projects': 0, 'projects_completed': 0}
+                    for type, project_types in group_title.items():
+                        if type not in project_frequency[int_manager]:
+                            project_frequency[int_manager][type] = 0
+                        int_manager_by_quarter_count[quarter][int_manager][type] += len(project_frequency[int_manager][type]) if project_frequency[int_manager][type] else 0
+                   
+                
+                # Reset the month count after each quarter
+                if month_count % 3 == 0:
+                    month_count = 0
+    
         except Exception as e:
             print(f'An error occured: {e}')
         
         create_json_file('raw_data/kpi_by_quarter.json',kpi_by_quarter)
-        create_json_file('raw_data/kpi_by_month.json',kpi_by_month)        
-        
-        return kpi_by_month, kpi_by_quarter
+        create_json_file('raw_data/kpi_by_month.json',kpi_by_month)
+        create_json_file('raw_data/int_manager_by_month.json',int_manager_by_month)
+        create_json_file('raw_data/int_manager_by_quarter_count.json',int_manager_by_quarter_count)
+        create_json_file('raw_data/int_manager_by_month_count.json',int_manager_by_month_count)
+
+        return kpi_by_month, kpi_by_quarter, int_manager_by_quarter_count, int_manager_by_month_count
 

@@ -7,7 +7,7 @@ from googleapiclient.errors import HttpError
 
 class GoogleBase:
     def __init__(self, google_scopes,
-                 google_app, google_app_version, presentation_id):
+                 google_app, google_app_version):
     # Call Google Slides
         SERVICE_ACCOUNT_FILE = 'integrationskpi-93d104cec721.json'
         self.creds = service_account.Credentials.from_service_account_file(
@@ -128,9 +128,9 @@ class GoogleDrive(GoogleBase):
             print(f"An error occurred: {error}")
 
 class GoogleSlides(GoogleBase):
-        def __init__(self, google_scopes, google_app, google_app_version, presentation_id):
-            super().__init__(google_scopes, google_app, google_app_version)
-            self.presentation_id = presentation_id
+    def __init__(self, google_scopes, google_app, google_app_version, presentation_id):
+        super().__init__(google_scopes, google_app, google_app_version)
+        self.presentation_id = presentation_id
 
     # Get slide data
     def get_slide(self):
